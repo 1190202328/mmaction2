@@ -1222,8 +1222,8 @@ class OpenCVDecode:
 
         for frame_ind in results['frame_inds']:
             if self.is_print:
-                print(results['filename'])
-                self.is_print = False
+                print('.', end='')
+                # self.is_print = False
             cur_frame = container[frame_ind]
             # last frame may be None in OpenCV
             while isinstance(cur_frame, type(None)):

@@ -6,13 +6,19 @@ import imageio
 parent_path = os.path.abspath(os.path.join(__file__, *(['..'] * 2)))
 sys.path.insert(0, parent_path)
 import pandas as pd
+import random
 
+random.seed(123456789)
 from tqdm import tqdm
 
 from data_process.analysis import get_map_dict
 
 
 def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/home/jjiang/data/zoo_clip'):
+    background_per_video = 2
+    min_duration = 5
+    max_duration = 30
+    background_idx = 0
     if os.path.exists(output_dir):
         raise Exception(f'{output_dir} 已经存在！')
     else:
@@ -21,6 +27,7 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
 
     total_class_clustered_dict, human_dict, total_class_human_changed = get_map_dict()
     label_dict = {total_class_human_changed[i]: i for i in range(len(total_class_human_changed))}
+    label_dict['background'] = len(label_dict)
 
     for train_or_test in os.listdir(source_dir):
         if train_or_test == 'train':
@@ -60,6 +67,31 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
                 else:
                     print(f'source_annotation_path')
                     raise Exception
+            # 统计gaps
+            total_gaps = len(start_local)
+            gaps = []
+            for segment_idx in range(total_gaps):
+                gaps.append([start_local[segment_idx], end_local[segment_idx]])
+            gaps = sorted(gaps, key=lambda x: x[0])
+            background_num = 0
+            # 加入背景
+            for segment_idx in range(total_gaps - 1):
+                duration_background = random.randint(min_duration, max_duration)
+                background_start = gaps[segment_idx][1]
+                if background_start + duration_background > gaps[segment_idx + 1][0]:
+                    continue
+
+                output_video_name = 'background/background_{background_idx}.mp4'
+                copy_path = f'{output_dir}/videos/{output_video_name}'
+                ff = f'ffmpeg -ss {background_start} -i {source_video_path} -t {duration_background} -c copy {copy_path}'
+                os.system(ff)
+                annotation_all += f'{output_video_name} {label_dict["background"]}\n'
+
+                background_num += 1
+                background_idx += 1
+                if background_num >= background_per_video:
+                    break
+
             for segment_idx in range(len(start_local)):
                 start_time = start_local[segment_idx]
                 end_time = end_local[segment_idx]
@@ -170,7 +202,7 @@ def del_result(output_dir='/home/jjiang/data/zoo_clip'):
 
 
 if __name__ == '__main__':
-    # video_clip()
+    video_clip()
     # remove_bad_video()
     # check_result()
-    del_result()
+    # del_result()
