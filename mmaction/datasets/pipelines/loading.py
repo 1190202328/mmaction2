@@ -1204,6 +1204,8 @@ class OpenCVDecode:
     Required keys are "video_reader", "filename" and "frame_inds", added or
     modified keys are "imgs", "img_shape" and "original_shape".
     """
+    def __init__(self):
+        self.is_print = True
 
     def __call__(self, results):
         """Perform the OpenCV decoding.
@@ -1219,6 +1221,9 @@ class OpenCVDecode:
             results['frame_inds'] = np.squeeze(results['frame_inds'])
 
         for frame_ind in results['frame_inds']:
+            if self.is_print:
+                print(results['filename'])
+                self.is_print = False
             cur_frame = container[frame_ind]
             # last frame may be None in OpenCV
             while isinstance(cur_frame, type(None)):
