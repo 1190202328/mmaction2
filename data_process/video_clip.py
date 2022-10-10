@@ -5,12 +5,15 @@ import subprocess
 
 import cv2
 import imageio
+import mmcv
 from decord import VideoReader
 
 parent_path = os.path.abspath(os.path.join(__file__, *(['..'] * 2)))
 sys.path.insert(0, parent_path)
 import pandas as pd
 import random
+from functools import partial
+from multiprocessing import Manager, Pool, cpu_count
 
 random.seed(123456789)
 from tqdm import tqdm
@@ -186,47 +189,67 @@ def _test_video_cv2(video_path):
         return False, 0
 
 
-def _test_video_decord(video_path):
+def _test_video_decord(lock, output_file, total_paths, idx):
+    video_path = total_paths[idx]
     try:
         capture = VideoReader(video_path)
         frame_count = len(capture)
         if frame_count < 30:
             print(f'{video_path} 太短了')
-            return False, frame_count
+            is_ok = False
         elif frame_count > 1000:
             print(f'{video_path} 太长了')
-            return False, frame_count
+            is_ok = False
         else:
             # import numpy as np
             # frame_ids = np.array([0, frame_count - 1])
             # print(capture.get_batch(frame_ids).asnumpy())
             frame_count_real = get_real_frames(video_path)
             if frame_count_real != frame_count:
-                print(f'frame_count_real{frame_count_real} != frame_count {frame_count}')
-                return False, 0
+                print(f'frame_count_real {frame_count_real} != frame_count {frame_count}')
+                is_ok = False
             else:
-                return True, frame_count
+                is_ok = True
     except OSError:
-        return False, 0
+        is_ok = False
+    if not is_ok:
+        lock.acquire()
+        with open(output_file, 'a') as f:
+            f.write(video_path + '\n')
+        lock.release()
 
 
 def remove_bad_video(output_dir='/home/jjiang/data/zoo_clip'):
+    bad_output_file = '/home/jjiang/experiments/mmaction2/bad_video_list.txt'
+    if os.path.exists(bad_output_file):
+        os.remove(bad_output_file)
+    # prepare for checking
+    pool = Pool(cpu_count() - 1)
+    lock = Manager().Lock()
+
     video_dir = f'{output_dir}/videos'
+    total_paths = []
     for train_or_test in ['train.list', 'val.list']:
-        new_txt = ''
+        new_result = ''
         with open(f'{output_dir}/{train_or_test}', mode='r', encoding='utf-8') as f:
             for line in tqdm(f.readlines()):
                 file_name = line.strip().split(' ')[0]
                 if os.path.exists(f'{video_dir}/{file_name}'):
-                    check, frame_count = _test_video_decord(f'{video_dir}/{file_name}')
-                    if not check:
-                        print(f'{video_dir}/{file_name} 视频损坏')
-                        raise Exception
-                        os.remove(f'{video_dir}/{file_name}')
-                    else:
-                        new_txt += line
+                    print(f'{video_dir}/{file_name}不存在！')
+                    total_paths.append(f'{video_dir}/{file_name}')
+                else:
+                    new_result += line
         with open(f'{output_dir}/{train_or_test}', mode='w', encoding='utf-8') as f:
-            f.write(new_txt)
+            f.write(new_result)
+    worker_fn = partial(_test_video_decord, lock, bad_output_file, total_paths)
+    ids = range(len(total_paths))
+
+    prog_bar = mmcv.ProgressBar(len(total_paths))
+    for _ in pool.imap_unordered(worker_fn, ids):
+        prog_bar.update()
+    # start checking
+    pool.close()
+    pool.join()
 
 
 def check_result(output_dir='/home/jjiang/data/zoo_clip'):
@@ -337,4 +360,4 @@ if __name__ == '__main__':
 
     # # 后续暂时不用，用mmaction的check
     # check_result()
-    # del_result(to_delete_file='/home/jjiang/mmaction2/invalid_videos_train.txt', output_dir='/home/jjiang/data/zoo_clip_new')
+    # del_result(to_delete_file='/home/jjiang/mmaction2/bad_video_list.txt', output_dir='/home/jjiang/data/zoo_clip_new')
