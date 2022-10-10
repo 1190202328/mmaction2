@@ -8,8 +8,12 @@ from multiprocessing import Manager, Pool, cpu_count
 import mmcv
 import numpy as np
 from mmcv import Config, DictAction
+from tqdm import tqdm
 
 from mmaction.datasets import PIPELINES, build_dataset
+
+import eventlet
+import time
 
 
 def parse_args():
@@ -21,16 +25,16 @@ def parse_args():
         action=DictAction,
         default={},
         help='custom options for evaluation, the key-value pair in xxx=yyy '
-        'format will be kwargs for dataset.evaluate() function (deprecate), '
-        'change to --eval-options instead.')
+             'format will be kwargs for dataset.evaluate() function (deprecate), '
+             'change to --eval-options instead.')
     parser.add_argument(
         '--cfg-options',
         nargs='+',
         action=DictAction,
         default={},
         help='override some settings in the used config, the key-value pair '
-        'in xxx=yyy format will be merged into config file. For example, '
-        "'--cfg-options model.backbone.depth=18 model.backbone.with_cp=True'")
+             'in xxx=yyy format will be merged into config file. For example, '
+             "'--cfg-options model.backbone.depth=18 model.backbone.with_cp=True'")
     parser.add_argument(
         '--output-file',
         default='invalid-video.txt',
@@ -78,6 +82,7 @@ class RandomSampleFrames:
             results (dict): The resulting dict to be modified and passed
                 to the next transform in pipeline.
         """
+        print(results['filename'])
         assert results['total_frames'] > 0
 
         # first and last frames
@@ -89,6 +94,7 @@ class RandomSampleFrames:
                 results['frame_inds'],
                 np.random.randint(1, results['total_frames'] - 1, 3)
             ])
+        print(results['filename'], '[end]')
 
         return results
 
@@ -98,13 +104,15 @@ def _do_check_videos(lock, dataset, output_file, idx):
         dataset[idx]
     except:  # noqa
         # save invalid video path to output file
-        lock.acquire()
+        print(f'{dataset.video_infos[idx]["filename"]} 文件出错', '!' * 100)
         with open(output_file, 'a') as f:
             f.write(dataset.video_infos[idx]['filename'] + '\n')
-        lock.release()
 
 
 if __name__ == '__main__':
+    eventlet.monkey_patch()
+    time_limit = 30  # set timeout time
+
     args = parse_args()
 
     decoder_to_pipeline_prefix = dict(
@@ -129,17 +137,14 @@ if __name__ == '__main__':
     if os.path.exists(args.output_file):
         # remove existing output file
         os.remove(args.output_file)
-    pool = Pool(args.num_processes)
-    lock = Manager().Lock()
-    worker_fn = partial(_do_check_videos, lock, dataset, args.output_file)
-    ids = range(len(dataset))
-
-    # start checking
-    prog_bar = mmcv.ProgressBar(len(dataset))
-    for _ in pool.imap_unordered(worker_fn, ids):
-        prog_bar.update()
-    pool.close()
-    pool.join()
+    for i in tqdm(range(len(dataset))):
+        try:
+            with eventlet.Timeout(time_limit, ValueError):
+                _do_check_videos(None, dataset, args.output_file, i)
+        except ValueError:
+            print(f'{dataset.video_infos[i]["filename"]} 文件出错', '!' * 100)
+            with open(args.output_file, 'a') as f:
+                f.write(dataset.video_infos[i]['filename'] + '\n')
 
     if os.path.exists(args.output_file):
         num_lines = sum(1 for _ in open(args.output_file))

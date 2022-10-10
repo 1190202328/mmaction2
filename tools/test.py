@@ -276,6 +276,7 @@ def main():
     cfg = Config.fromfile(args.config)
 
     cfg.merge_from_dict(args.cfg_options)
+    cfg.gpu_ids = ['cuda:0']
 
     # set multi-process settings
     setup_multi_processes(cfg)

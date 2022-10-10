@@ -5,17 +5,17 @@ _base_ = [
 
 # dataset settings
 dataset_type = 'VideoDataset'
-data_root = '/home/jjiang/data/zoo_clip/videos'
-data_root_val = '/home/jjiang/data/zoo_clip/videos'
-ann_file_train = '/home/jjiang/data/zoo_clip/train.list'
-ann_file_val = '/home/jjiang/data/zoo_clip/val.list'
-ann_file_test = '/home/jjiang/data/zoo_clip/val.list'
+data_root = '/home/jjiang/data/zoo_clip_new/videos'
+data_root_val = '/home/jjiang/data/zoo_clip_new/videos'
+ann_file_train = '/home/jjiang/data/zoo_clip_new/train.list'
+ann_file_val = '/home/jjiang/data/zoo_clip_new/val.list'
+ann_file_test = '/home/jjiang/data/zoo_clip_new/val.list'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_bgr=False)
 train_pipeline = [
-    dict(type='OpenCVInit'),
+    dict(type='DecordInit'),
     dict(type='SampleFrames', clip_len=1, frame_interval=1, num_clips=8),
-    dict(type='OpenCVDecode'),
+    dict(type='DecordDecode'),
     dict(
         type='MultiScaleCrop',
         input_size=224,
@@ -30,14 +30,14 @@ train_pipeline = [
     dict(type='ToTensor', keys=['imgs', 'label'])
 ]
 val_pipeline = [
-    dict(type='OpenCVInit'),
+    dict(type='DecordInit'),
     dict(
         type='SampleFrames',
         clip_len=1,
         frame_interval=1,
         num_clips=8,
         test_mode=True),
-    dict(type='OpenCVDecode'),
+    dict(type='DecordDecode'),
     dict(type='Resize', scale=(-1, 256)),
     dict(type='CenterCrop', crop_size=224),
     dict(type='Normalize', **img_norm_cfg),
@@ -46,14 +46,14 @@ val_pipeline = [
     dict(type='ToTensor', keys=['imgs'])
 ]
 test_pipeline = [
-    dict(type='OpenCVInit'),
+    dict(type='DecordInit'),
     dict(
         type='SampleFrames',
         clip_len=1,
         frame_interval=1,
         num_clips=25,
         test_mode=True),
-    dict(type='OpenCVDecode'),
+    dict(type='DecordDecode'),
     dict(type='Resize', scale=(-1, 256)),
     dict(type='TenCrop', crop_size=224),
     dict(type='Normalize', **img_norm_cfg),
@@ -62,8 +62,8 @@ test_pipeline = [
     dict(type='ToTensor', keys=['imgs'])
 ]
 data = dict(
-    videos_per_gpu=8,
-    workers_per_gpu=8,
+    videos_per_gpu=10,
+    workers_per_gpu=4,
     test_dataloader=dict(videos_per_gpu=1),
     train=dict(
         type=dataset_type,

@@ -158,7 +158,7 @@ class SampleFrames:
                 clip_offsets = (base_offsets + np.random.uniform(
                     0, avg_interval, self.num_clips)).astype(np.int)
             else:
-                clip_offsets = np.zeros((self.num_clips, ), dtype=np.int)
+                clip_offsets = np.zeros((self.num_clips,), dtype=np.int)
         else:
             avg_interval = (num_frames - ori_clip_len + 1) // self.num_clips
 
@@ -174,7 +174,7 @@ class SampleFrames:
                 ratio = (num_frames - ori_clip_len + 1.0) / self.num_clips
                 clip_offsets = np.around(np.arange(self.num_clips) * ratio)
             else:
-                clip_offsets = np.zeros((self.num_clips, ), dtype=np.int)
+                clip_offsets = np.zeros((self.num_clips,), dtype=np.int)
 
         return clip_offsets
 
@@ -200,7 +200,7 @@ class SampleFrames:
             if self.twice_sample:
                 clip_offsets = np.concatenate([clip_offsets, base_offsets])
         else:
-            clip_offsets = np.zeros((self.num_clips, ), dtype=np.int)
+            clip_offsets = np.zeros((self.num_clips,), dtype=np.int)
         return clip_offsets
 
     def _sample_clips(self, num_frames):
@@ -287,7 +287,6 @@ class UntrimmedSampleFrames:
     """
 
     def __init__(self, clip_len=1, frame_interval=16, start_index=None):
-
         self.clip_len = clip_len
         self.frame_interval = frame_interval
 
@@ -311,7 +310,7 @@ class UntrimmedSampleFrames:
         num_clips = clip_centers.shape[0]
         frame_inds = clip_centers[:, None] + np.arange(
             -(self.clip_len // 2), self.clip_len -
-            (self.clip_len // 2))[None, :]
+                                   (self.clip_len // 2))[None, :]
         # clip frame_inds to legal range
         frame_inds = np.clip(frame_inds, 0, total_frames - 1)
 
@@ -425,7 +424,6 @@ class DenseSampleFrames(SampleFrames):
 class SampleAVAFrames(SampleFrames):
 
     def __init__(self, clip_len, frame_interval=2, test_mode=False):
-
         super().__init__(clip_len, frame_interval, test_mode=test_mode)
 
     def _get_clips(self, center_index, skip_offsets, shot_info):
@@ -540,7 +538,7 @@ class SampleProposalFrames(SampleFrames):
             offsets = base_offsets + np.random.randint(
                 avg_interval, size=num_segments)
         else:
-            offsets = np.zeros((num_segments, ), dtype=np.int)
+            offsets = np.zeros((num_segments,), dtype=np.int)
 
         return offsets
 
@@ -565,7 +563,7 @@ class SampleProposalFrames(SampleFrames):
             base_offsets = np.arange(num_segments) * avg_interval
             offsets = (base_offsets + avg_interval / 2.0).astype(np.int)
         else:
-            offsets = np.zeros((num_segments, ), dtype=np.int)
+            offsets = np.zeros((num_segments,), dtype=np.int)
 
         return offsets
 
@@ -704,7 +702,7 @@ class SampleProposalFrames(SampleFrames):
         results['clip_len'] = self.clip_len
         results['frame_interval'] = self.frame_interval
         results['num_clips'] = (
-            self.body_segments + self.aug_segments[0] + self.aug_segments[1])
+                self.body_segments + self.aug_segments[0] + self.aug_segments[1])
         if self.mode in ['train', 'val']:
             results['num_proposals'] = len(results['out_proposals'])
 
@@ -856,6 +854,7 @@ class PyAVDecode:
         results['img_shape'] = imgs[0].shape[:2]
         results['video_reader'] = None
         del container
+        print('.', end='')
 
         return results
 
@@ -1128,6 +1127,7 @@ class DecordDecode:
         results['imgs'] = imgs
         results['original_shape'] = imgs[0].shape[:2]
         results['img_shape'] = imgs[0].shape[:2]
+        print('.', end='')
 
         return results
 
@@ -1204,6 +1204,7 @@ class OpenCVDecode:
     Required keys are "video_reader", "filename" and "frame_inds", added or
     modified keys are "imgs", "img_shape" and "original_shape".
     """
+
     def __init__(self):
         self.is_print = True
 
@@ -1711,7 +1712,7 @@ class LoadLocalizationFeature:
     """
 
     def __init__(self, raw_feature_ext='.csv'):
-        valid_raw_feature_ext = ('.csv', )
+        valid_raw_feature_ext = ('.csv',)
         if raw_feature_ext not in valid_raw_feature_ext:
             raise NotImplementedError
         self.raw_feature_ext = raw_feature_ext
@@ -1799,11 +1800,11 @@ class LoadProposals:
         self.top_k = top_k
         self.pgm_proposals_dir = pgm_proposals_dir
         self.pgm_features_dir = pgm_features_dir
-        valid_proposal_ext = ('.csv', )
+        valid_proposal_ext = ('.csv',)
         if proposal_ext not in valid_proposal_ext:
             raise NotImplementedError
         self.proposal_ext = proposal_ext
-        valid_feature_ext = ('.npy', )
+        valid_feature_ext = ('.npy',)
         if feature_ext not in valid_feature_ext:
             raise NotImplementedError
         self.feature_ext = feature_ext
