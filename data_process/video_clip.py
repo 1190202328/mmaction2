@@ -2,6 +2,7 @@ import os
 import sys
 from pprint import pprint
 import subprocess
+from moviepy.video.io.VideoFileClip import VideoFileClip
 
 import cv2
 import imageio
@@ -86,6 +87,8 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
                 gaps.append([start_local[segment_idx], end_local[segment_idx]])
             gaps = sorted(gaps, key=lambda x: x[0])
             background_num = 0
+            video = VideoFileClip(source_video_path)
+            video = video.without_audio()  # 去掉视频的音频
             # 加入背景
             if not os.path.exists(f'{output_dir}/videos/background'):
                 os.makedirs(f'{output_dir}/videos/background')
@@ -100,8 +103,14 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
 
                 output_video_name = f'background/background_{background_idx}.mp4'
                 copy_path = f'{output_dir}/videos/{output_video_name}'
-                ff = f'ffmpeg -ss {background_start} -i {source_video_path} -t {duration_background} -c copy {copy_path}'
-                os.system(ff)
+                # ff = f'ffmpeg -ss {background_start} -i {source_video_path} -t {duration_background} -c copy {copy_path}'
+                # os.system(ff)
+                try:
+                    clip = video.subclip(background_start, background_start + duration_background)  # 执行剪切操作
+                    clip.to_videofile(copy_path, fps=25, remove_temp=True)  # 输出文件
+                except ValueError:
+                    continue
+
                 annotation_all += f'{output_video_name} {label_dict["background"]}\n'
 
                 background_num += 1
@@ -137,8 +146,14 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
                         # 超时了
                         if start_time + max_duration > total_time:
                             break
-                        ff = f'ffmpeg -ss {start_time} -i {source_video_path} -t {max_duration} -c copy {copy_path}'
-                        os.system(ff)
+                        # ff = f'ffmpeg -ss {start_time} -i {source_video_path} -t {max_duration} -c copy {copy_path}'
+                        # os.system(ff)
+                        try:
+                            clip = video.subclip(start_time, start_time + max_duration)  # 执行剪切操作
+                            clip.to_videofile(copy_path, fps=25, remove_temp=True)  # 输出文件
+                        except ValueError:
+                            break
+
                         annotation_all += f'{output_video_name} {label_dict[new_label]}\n'
 
                         start_time += int(max_duration * (1 - clip_overlap_ratio))
@@ -154,8 +169,14 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
                         if not os.path.exists(f'{output_dir}/videos/{new_label}'):
                             os.makedirs(f'{output_dir}/videos/{new_label}')
 
-                        ff = f'ffmpeg -ss {start_time} -i {source_video_path} -t {duration} -c copy {copy_path}'
-                        os.system(ff)
+                        # ff = f'ffmpeg -ss {start_time} -i {source_video_path} -t {duration} -c copy {copy_path}'
+                        # os.system(ff)
+                        try:
+                            clip = video.subclip(start_time, start_time + duration)  # 执行剪切操作
+                            clip.to_videofile(copy_path, fps=25, remove_temp=True)  # 输出文件
+                        except ValueError:
+                            continue
+
                         annotation_all += f'{output_video_name} {label_dict[new_label]}\n'
 
         with open(annotation_output_path, mode='w', encoding='utf-8') as f:
@@ -241,6 +262,7 @@ def remove_bad_video(output_dir='/home/jjiang/data/zoo_clip'):
                     new_result += line
         with open(f'{output_dir}/{train_or_test}', mode='w', encoding='utf-8') as f:
             f.write(new_result)
+
     worker_fn = partial(_test_video_decord, lock, bad_output_file, total_paths)
     ids = range(len(total_paths))
 
@@ -341,7 +363,7 @@ def get_real_frames(video_path: str):
 
 
 if __name__ == '__main__':
-    # video_clip(output_dir='/home/jjiang/data/zoo_clip_new')
+    video_clip(output_dir='/home/jjiang/data/zoo_clip_new')
     remove_bad_video(output_dir='/home/jjiang/data/zoo_clip_new')
     # analysis_result(output_dir='/home/jjiang/data/zoo_clip_new')
 
