@@ -15,6 +15,7 @@ import random
 from functools import partial
 from multiprocessing import Manager, Pool, cpu_count
 import time
+from moviepy.video.io.VideoFileClip import VideoFileClip
 
 random.seed(123456789)
 from tqdm import tqdm
@@ -88,6 +89,7 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
                 gaps.append([start_local[segment_idx], end_local[segment_idx]])
             gaps = sorted(gaps, key=lambda x: x[0])
             background_num = 0
+            local_segments = []
             # 加入背景
             if not os.path.exists(f'{output_dir}/videos/background'):
                 os.makedirs(f'{output_dir}/videos/background')
@@ -104,9 +106,9 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
                 copy_path = f'{output_dir}/videos/{output_video_name}'
                 # ff = f'ffmpeg -ss {background_start} -i {source_video_path} -t {duration_background} -c copy {copy_path}'
 
-                ff = f'ffmpeg -i {source_video_path} -ss {background_start} -to {background_start + duration_background} -an {copy_path}'
+                # ff = f'ffmpeg -i {source_video_path} -ss {background_start} -to {background_start + duration_background} -an {copy_path}'
                 # os.system(ff)
-                to_do_cmds.append(ff)
+                local_segments.append([source_video_path, background_start, duration_background, copy_path])
 
                 annotation_all += f'{output_video_name} {label_dict["background"]}\n'
 
@@ -144,9 +146,9 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
                         if start_time + max_duration > total_time:
                             break
                         # ff = f'ffmpeg -ss {start_time} -i {source_video_path} -t {max_duration} -c copy {copy_path}'
-                        ff = f'ffmpeg -i {source_video_path} -ss {start_time} -to {start_time + max_duration} -an {copy_path}'
+                        # ff = f'ffmpeg -i {source_video_path} -ss {start_time} -to {start_time + max_duration} -an {copy_path}'
                         # os.system(ff)
-                        to_do_cmds.append(ff)
+                        local_segments.append([source_video_path, start_time, max_duration, copy_path])
 
                         annotation_all += f'{output_video_name} {label_dict[new_label]}\n'
 
@@ -164,28 +166,39 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
                             os.makedirs(f'{output_dir}/videos/{new_label}')
 
                         # ff = f'ffmpeg -ss {start_time} -i {source_video_path} -t {duration} -c copy {copy_path}'
-                        ff = f'ffmpeg -i {source_video_path} -ss {start_time} -to {start_time + duration} -an {copy_path}'
+                        # ff = f'ffmpeg -i {source_video_path} -ss {start_time} -to {start_time + duration} -an {copy_path}'
                         # os.system(ff)
-                        to_do_cmds.append(ff)
+                        local_segments.append([source_video_path, start_time, duration, copy_path])
 
                         annotation_all += f'{output_video_name} {label_dict[new_label]}\n'
+            to_do_cmds.append(local_segments)
 
         with open(annotation_output_path, mode='w', encoding='utf-8') as f:
             f.write(annotation_all)
-    # # 一个一个执行
-    # for i in tqdm(range(len(to_do_cmds))):
-    #     do_cmd(to_do_cmds, i)
 
-    with open('/home/jjiang/experiments/mmaction2/data_process/todo_cmd.txt', mode='w',
-              encoding='utf-8') as f:
-        for i in tqdm(range(len(to_do_cmds))):
-            f.write(f'{to_do_cmds[i]} -loglevel +quiet \n')
+    pool = Pool(int((cpu_count() - 1) / 2))
+    worker_fn = partial(do_cmd, to_do_cmds)
+    ids = range(len(to_do_cmds))
+
+    prog_bar = mmcv.ProgressBar(len(to_do_cmds))
+    for _ in pool.imap_unordered(worker_fn, ids):
+        prog_bar.update()
+    # start checking
+    pool.close()
+    pool.join()
+    print('all down!')
 
 
 def do_cmd(cmds, idx):
-    # print(f'正在处理{cmds[idx]} ！')
-    os.system(f'{cmds[idx]} -loglevel +quiet')
-    # print(f'{cmds[idx]} 处理完毕！')
+    print(f'正在处理{cmds[idx][0][0]} ！')
+    video = VideoFileClip(cmds[idx][0][0], audio=False)  # 去掉视频的音频
+    for i in range(len(cmds[idx])):
+        try:
+            clip = video.subclip(cmds[idx][i][1], cmds[idx][i][1] + cmds[idx][i][2])  # 执行剪切操作
+            clip.to_videofile(cmds[idx][i][3], fps=25, remove_temp=True)  # 输出文件
+        except ValueError:
+            continue
+    print(f'{cmds[idx][0][0]} 处理完毕！')
 
 
 def _test_video_cv2(video_path):
