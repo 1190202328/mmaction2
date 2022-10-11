@@ -1127,7 +1127,7 @@ class DecordDecode:
         results['imgs'] = imgs
         results['original_shape'] = imgs[0].shape[:2]
         results['img_shape'] = imgs[0].shape[:2]
-        print('.', end='')
+        # print('.', end='')
 
         return results
 

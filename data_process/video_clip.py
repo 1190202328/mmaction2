@@ -200,12 +200,12 @@ def do_cmd(cmds, idx):
     for i in range(len(cmds[idx])):
         try:
             clip = video.subclip(cmds[idx][i][1], cmds[idx][i][1] + cmds[idx][i][2])  # 执行剪切操作
-            clip.to_videofile(cmds[idx][i][3], fps=25, logger=None, remove_temp=True)  # 输出文件
+            clip.to_videofile(cmds[idx][i][3], fps=25, logger=None, remove_temp=True, audio=False, threads=2)  # 输出文件
         except ValueError:
             print('视频剪切长度不符合要求！')
             continue
         except IOError:
-            print('视频保存出错！')
+            print(f'视频[{cmds[idx][i][3]}]保存出错！')
             continue
     print(f'{cmds[idx][0][0]} 处理完毕！')
 
@@ -225,7 +225,7 @@ def _test_video_cv2(video_path):
         if frame_count != count:
             return False, 0
         else:
-            if frame_count < 30:
+            if frame_count < 20:
                 print(f'{video_path} 太短了')
                 return False, frame_count
             elif frame_count > 1000:
@@ -242,7 +242,7 @@ def _test_video_decord(lock, output_file, total_paths, idx):
     try:
         capture = VideoReader(video_path)
         frame_count = len(capture)
-        if frame_count < 30:
+        if frame_count < 20:
             print(f'{video_path} 太短了')
             is_ok = False
         elif frame_count > 1000:
@@ -414,11 +414,11 @@ def remove_blank_path(train_test_dir='/home/jjiang/data/train_test_video'):
 if __name__ == '__main__':
     # remove_blank_path()
 
-    video_clip(output_dir='/home/jjiang/data/zoo_clip_new')
+    # video_clip(output_dir='/home/jjiang/data/zoo_clip_new')
     # remove_bad_video(output_dir='/home/jjiang/data/zoo_clip_new')
     # del_result(to_delete_file='/home/jjiang/experiments/mmaction2/bad_video_list.txt', output_dir='/home/jjiang/data/zoo_clip_new')
     # remove_bad_video(output_dir='/home/jjiang/data/zoo_clip_new')
-    # analysis_result(output_dir='/home/jjiang/data/zoo_clip_new')
+    analysis_result(output_dir='/home/jjiang/data/zoo_clip_new')
 
     # 检查数据
     # python tools/analysis/check_videos.py configs/recognition/tsn/my_tsn_r50_video_1x1x8_100e_kinetics400_rgb.py \
