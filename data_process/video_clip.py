@@ -176,7 +176,7 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
         with open(annotation_output_path, mode='w', encoding='utf-8') as f:
             f.write(annotation_all)
 
-    pool = Pool(int((cpu_count() - 1) / 2))
+    pool = Pool(int((cpu_count() - 1)))
     worker_fn = partial(do_cmd, to_do_cmds)
     ids = range(len(to_do_cmds))
 
@@ -190,13 +190,22 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
 
 
 def do_cmd(cmds, idx):
-    print(f'正在处理{cmds[idx][0][0]} ！')
+    try:
+        print(f'正在处理{cmds[idx][0][0]} ！')
+    except IndexError:
+        print('这个视频不需要切片！')
+        return
     video = VideoFileClip(cmds[idx][0][0], audio=False)  # 去掉视频的音频
+    video = video.without_audio()  # 去掉视频的音频
     for i in range(len(cmds[idx])):
         try:
             clip = video.subclip(cmds[idx][i][1], cmds[idx][i][1] + cmds[idx][i][2])  # 执行剪切操作
-            clip.to_videofile(cmds[idx][i][3], fps=25, remove_temp=True)  # 输出文件
+            clip.to_videofile(cmds[idx][i][3], fps=25, logger=None, remove_temp=True)  # 输出文件
         except ValueError:
+            print('视频剪切长度不符合要求！')
+            continue
+        except IOError:
+            print('视频保存出错！')
             continue
     print(f'{cmds[idx][0][0]} 处理完毕！')
 
@@ -248,8 +257,11 @@ def _test_video_decord(lock, output_file, total_paths, idx):
                 print(f'frame_count_real {frame_count_real} != frame_count {frame_count}')
                 is_ok = False
             else:
+                print(f'{video_path} 完整！')
                 is_ok = True
     except OSError:
+        is_ok = False
+    except RuntimeError:
         is_ok = False
     if not is_ok:
         lock.acquire()
@@ -278,10 +290,8 @@ def remove_bad_video(output_dir='/home/jjiang/data/zoo_clip'):
                 else:
                     total_paths.append(f'{video_dir}/{file_name}')
                     new_result += line
-        # with open(f'{output_dir}/{train_or_test}', mode='w', encoding='utf-8') as f:
-        #     f.write(new_result)
-        print(new_result)
-    raise Exception
+        with open(f'{output_dir}/{train_or_test}', mode='w', encoding='utf-8') as f:
+            f.write(new_result)
 
     worker_fn = partial(_test_video_decord, lock, bad_output_file, total_paths)
     ids = range(len(total_paths))
@@ -292,6 +302,14 @@ def remove_bad_video(output_dir='/home/jjiang/data/zoo_clip'):
     # start checking
     pool.close()
     pool.join()
+    error_count = 0
+    try:
+        with open(bad_output_file, mode='r', encoding='utf-8') as f:
+            for _ in f.readlines():
+                error_count += 1
+        print(f'\n共{error_count}个错误视频！')
+    except FileNotFoundError:
+        print('\n视频全部完整！')
 
 
 def check_result(output_dir='/home/jjiang/data/zoo_clip'):
@@ -311,24 +329,24 @@ def check_result(output_dir='/home/jjiang/data/zoo_clip'):
 
 
 def del_result(to_delete_file, output_dir='/home/jjiang/data/zoo_clip'):
-    # to_delete_names = []
-    # with open(to_delete_file, mode='r', encoding='utf-8') as f:
-    #     for line in f.readlines():
-    #         to_delete_names.append(line.strip())
-
-    to_delete_names = ['狮子小动/小狮子小猴子打架_27_0.mp4']
+    to_delete_names = []
+    with open(to_delete_file, mode='r', encoding='utf-8') as f:
+        for line in f.readlines():
+            to_delete_names.append(line.strip())
 
     for to_delete_name in to_delete_names:
+        # print('to_delete_name', to_delete_name)
         video_dir = f'{output_dir}/videos'
         for train_or_test in ['train.list', 'val.list']:
             new_txt = ''
             with open(f'{output_dir}/{train_or_test}', mode='r', encoding='utf-8') as f:
                 for line in tqdm(f.readlines()):
                     file_name = line.strip().split(' ')[0]
+                    # print(file_name)
                     label = line.strip().split(' ')[1]
-                    if file_name == to_delete_name:
-                        os.remove(f'{video_dir}/{file_name}')
-                        print(f'找到坏的视频 {video_dir}/{file_name}')
+                    if f'{video_dir}/{file_name}' == to_delete_name:
+                        os.remove(f'{to_delete_name}')
+                        print(f'找到坏的视频 {to_delete_name}')
                     else:
                         new_txt += line
             with open(f'{output_dir}/{train_or_test}', mode='w', encoding='utf-8') as f:
@@ -395,7 +413,10 @@ def remove_blank_path(train_test_dir='/home/jjiang/data/train_test_video'):
 
 if __name__ == '__main__':
     # remove_blank_path()
+
     video_clip(output_dir='/home/jjiang/data/zoo_clip_new')
+    # remove_bad_video(output_dir='/home/jjiang/data/zoo_clip_new')
+    # del_result(to_delete_file='/home/jjiang/experiments/mmaction2/bad_video_list.txt', output_dir='/home/jjiang/data/zoo_clip_new')
     # remove_bad_video(output_dir='/home/jjiang/data/zoo_clip_new')
     # analysis_result(output_dir='/home/jjiang/data/zoo_clip_new')
 
@@ -414,4 +435,3 @@ if __name__ == '__main__':
 
     # # 后续暂时不用，用mmaction的check
     # check_result()
-    # del_result(to_delete_file='/home/jjiang/mmaction2/bad_video_list.txt', output_dir='/home/jjiang/data/zoo_clip_new')
