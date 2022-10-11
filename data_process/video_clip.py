@@ -172,26 +172,20 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
 
         with open(annotation_output_path, mode='w', encoding='utf-8') as f:
             f.write(annotation_all)
+    # # 一个一个执行
+    # for i in tqdm(range(len(to_do_cmds))):
+    #     do_cmd(to_do_cmds, i)
 
-    # pool = Pool(int((cpu_count() - 1)/2))
-    # worker_fn = partial(do_cmd, to_do_cmds)
-    # ids = range(len(to_do_cmds))
-    #
-    # prog_bar = mmcv.ProgressBar(len(to_do_cmds))
-    # for _ in pool.imap_unordered(worker_fn, ids):
-    #     prog_bar.update()
-    # # start checking
-    # pool.close()
-    # pool.join()
-    # print('all down!')
-    for i in range(len(to_do_cmds)):
-        do_cmd(to_do_cmds, i)
+    with open('/home/jjiang/experiments/mmaction2/data_process/todo_cmd.txt', mode='w',
+              encoding='utf-8') as f:
+        for i in tqdm(range(len(to_do_cmds))):
+            f.write(f'{to_do_cmds[i]} -loglevel +quiet \n')
 
 
 def do_cmd(cmds, idx):
-    print(f'正在处理{cmds[idx]} ！')
-    os.system(cmds[idx])
-    print(f'{cmds[idx]} 处理完毕！')
+    # print(f'正在处理{cmds[idx]} ！')
+    os.system(f'{cmds[idx]} -loglevel +quiet')
+    # print(f'{cmds[idx]} 处理完毕！')
 
 
 def _test_video_cv2(video_path):
@@ -271,8 +265,10 @@ def remove_bad_video(output_dir='/home/jjiang/data/zoo_clip'):
                 else:
                     total_paths.append(f'{video_dir}/{file_name}')
                     new_result += line
-        with open(f'{output_dir}/{train_or_test}', mode='w', encoding='utf-8') as f:
-            f.write(new_result)
+        # with open(f'{output_dir}/{train_or_test}', mode='w', encoding='utf-8') as f:
+        #     f.write(new_result)
+        print(new_result)
+    raise Exception
 
     worker_fn = partial(_test_video_decord, lock, bad_output_file, total_paths)
     ids = range(len(total_paths))
