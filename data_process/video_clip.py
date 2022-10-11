@@ -2,7 +2,6 @@ import os
 import sys
 from pprint import pprint
 import subprocess
-from moviepy.video.io.VideoFileClip import VideoFileClip
 
 import cv2
 import imageio
@@ -15,6 +14,7 @@ import pandas as pd
 import random
 from functools import partial
 from multiprocessing import Manager, Pool, cpu_count
+import time
 
 random.seed(123456789)
 from tqdm import tqdm
@@ -33,6 +33,7 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
     else:
         os.makedirs(output_dir)
         os.makedirs(f'{output_dir}/videos')
+    to_do_cmds = []
 
     total_class_clustered_dict, human_dict, total_class_human_changed = get_map_dict()
     label_dict = {total_class_human_changed[i]: i for i in range(len(total_class_human_changed))}
@@ -69,12 +70,12 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
                 end_local = data['end'].tolist()
                 data_local = data['label'].tolist()
             except KeyError:
-                if file_name == 'F3694 小天鹅房车':
+                if file_name == 'F3694小天鹅房车':
                     start_local = data['video_name'].tolist()
                     end_local = data['duration_s'].tolist()
                     data_local = data['duration_frame'].tolist()
                 else:
-                    print(f'source_annotation_path')
+                    print(f'{source_annotation_path}')
                     raise Exception
             try:
                 total_time = get_video_duration(source_video_path)
@@ -87,8 +88,6 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
                 gaps.append([start_local[segment_idx], end_local[segment_idx]])
             gaps = sorted(gaps, key=lambda x: x[0])
             background_num = 0
-            video = VideoFileClip(source_video_path)
-            video = video.without_audio()  # 去掉视频的音频
             # 加入背景
             if not os.path.exists(f'{output_dir}/videos/background'):
                 os.makedirs(f'{output_dir}/videos/background')
@@ -104,12 +103,10 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
                 output_video_name = f'background/background_{background_idx}.mp4'
                 copy_path = f'{output_dir}/videos/{output_video_name}'
                 # ff = f'ffmpeg -ss {background_start} -i {source_video_path} -t {duration_background} -c copy {copy_path}'
+
+                ff = f'ffmpeg -i {source_video_path} -ss {background_start} -to {background_start + duration_background} -an {copy_path}'
                 # os.system(ff)
-                try:
-                    clip = video.subclip(background_start, background_start + duration_background)  # 执行剪切操作
-                    clip.to_videofile(copy_path, fps=25, remove_temp=True)  # 输出文件
-                except ValueError:
-                    continue
+                to_do_cmds.append(ff)
 
                 annotation_all += f'{output_video_name} {label_dict["background"]}\n'
 
@@ -147,12 +144,9 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
                         if start_time + max_duration > total_time:
                             break
                         # ff = f'ffmpeg -ss {start_time} -i {source_video_path} -t {max_duration} -c copy {copy_path}'
+                        ff = f'ffmpeg -i {source_video_path} -ss {start_time} -to {start_time + max_duration} -an {copy_path}'
                         # os.system(ff)
-                        try:
-                            clip = video.subclip(start_time, start_time + max_duration)  # 执行剪切操作
-                            clip.to_videofile(copy_path, fps=25, remove_temp=True)  # 输出文件
-                        except ValueError:
-                            break
+                        to_do_cmds.append(ff)
 
                         annotation_all += f'{output_video_name} {label_dict[new_label]}\n'
 
@@ -170,17 +164,34 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
                             os.makedirs(f'{output_dir}/videos/{new_label}')
 
                         # ff = f'ffmpeg -ss {start_time} -i {source_video_path} -t {duration} -c copy {copy_path}'
+                        ff = f'ffmpeg -i {source_video_path} -ss {start_time} -to {start_time + duration} -an {copy_path}'
                         # os.system(ff)
-                        try:
-                            clip = video.subclip(start_time, start_time + duration)  # 执行剪切操作
-                            clip.to_videofile(copy_path, fps=25, remove_temp=True)  # 输出文件
-                        except ValueError:
-                            continue
+                        to_do_cmds.append(ff)
 
                         annotation_all += f'{output_video_name} {label_dict[new_label]}\n'
 
         with open(annotation_output_path, mode='w', encoding='utf-8') as f:
             f.write(annotation_all)
+
+    # pool = Pool(int((cpu_count() - 1)/2))
+    # worker_fn = partial(do_cmd, to_do_cmds)
+    # ids = range(len(to_do_cmds))
+    #
+    # prog_bar = mmcv.ProgressBar(len(to_do_cmds))
+    # for _ in pool.imap_unordered(worker_fn, ids):
+    #     prog_bar.update()
+    # # start checking
+    # pool.close()
+    # pool.join()
+    # print('all down!')
+    for i in range(len(to_do_cmds)):
+        do_cmd(to_do_cmds, i)
+
+
+def do_cmd(cmds, idx):
+    print(f'正在处理{cmds[idx]} ！')
+    os.system(cmds[idx])
+    print(f'{cmds[idx]} 处理完毕！')
 
 
 def _test_video_cv2(video_path):
@@ -255,10 +266,10 @@ def remove_bad_video(output_dir='/home/jjiang/data/zoo_clip'):
         with open(f'{output_dir}/{train_or_test}', mode='r', encoding='utf-8') as f:
             for line in tqdm(f.readlines()):
                 file_name = line.strip().split(' ')[0]
-                if os.path.exists(f'{video_dir}/{file_name}'):
+                if not os.path.exists(f'{video_dir}/{file_name}'):
                     print(f'{video_dir}/{file_name}不存在！')
-                    total_paths.append(f'{video_dir}/{file_name}')
                 else:
+                    total_paths.append(f'{video_dir}/{file_name}')
                     new_result += line
         with open(f'{output_dir}/{train_or_test}', mode='w', encoding='utf-8') as f:
             f.write(new_result)
@@ -362,9 +373,21 @@ def get_real_frames(video_path: str):
     return int(duration_info)
 
 
+def remove_blank_path(train_test_dir='/home/jjiang/data/train_test_video'):
+    for train_or_test in os.listdir(train_test_dir):
+        directory = f'{train_test_dir}/{train_or_test}'
+        for file in os.listdir(directory):
+            path = f'{directory}/{file}'
+            path_without_blank = ''.join(path.split(' '))
+            if path != path_without_blank:
+                print(f'{path} -> {path_without_blank}')
+                os.rename(path, path_without_blank)
+
+
 if __name__ == '__main__':
+    # remove_blank_path()
     video_clip(output_dir='/home/jjiang/data/zoo_clip_new')
-    remove_bad_video(output_dir='/home/jjiang/data/zoo_clip_new')
+    # remove_bad_video(output_dir='/home/jjiang/data/zoo_clip_new')
     # analysis_result(output_dir='/home/jjiang/data/zoo_clip_new')
 
     # 检查数据
