@@ -22,6 +22,26 @@ from tqdm import tqdm
 
 from data_process.analysis import get_map_dict
 
+label_en_map_dict = {
+    '捕食': 'predation',
+    '水豚嬉戏': 'capybara_play',
+    '水豚小动': 'capybara_move',
+    '海龟小动': 'turtle_move',
+    '熊嬉戏': 'bear_play',
+    '熊小动': 'bear_move',
+    '熊走路': 'bear_walk',
+    '狗小动': 'dog_move',
+    '狮子小动': 'lion_move',
+    '狮子走路': 'lion_walk',
+    '猫小动': 'cat_move',
+    '猴子小动': 'monkey_move',
+    '猴子走路': 'monkey_walk',
+    '老虎小动': 'tiger_move',
+    '老虎走路': 'tiger_walk',
+    '跳跃': 'jump',
+    '进食': 'eat'
+}
+
 
 def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/home/jjiang/data/zoo_clip'):
     background_per_video = 3
@@ -372,6 +392,11 @@ def analysis_result(output_dir='/home/jjiang/data/zoo_clip'):
         print(len(label_set))
         pprint(label_dict)
     pprint(label_dict_key)
+    if os.path.exists(f'{output_dir}/label.txt'):
+        print(f'标签文件已存在，路径:[{output_dir}/label.txt]')
+    with open(f'{output_dir}/label.txt', mode='w', encoding='utf-8') as f:
+        for i in total_class_human_changed:
+            f.write(f'{label_en_map_dict[i]}\n')
 
 
 def get_video_duration(video_path: str):

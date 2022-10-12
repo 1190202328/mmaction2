@@ -7,12 +7,16 @@ import cv2
 import decord
 import numpy as np
 import torch
-import webcolors
-from mmcv import Config, DictAction
 
+
+print('!!!')
+import webcolors
+print('??')
+from mmcv import Config, DictAction
+print('!')
 from mmaction.apis import inference_recognizer, init_recognizer
 
-
+print('!!s')
 def parse_args():
     parser = argparse.ArgumentParser(description='MMAction2 demo')
     parser.add_argument('config', help='test config file path')
@@ -25,8 +29,8 @@ def parse_args():
         action=DictAction,
         default={},
         help='override some settings in the used config, the key-value pair '
-        'in xxx=yyy format will be merged into config file. For example, '
-        "'--cfg-options model.backbone.depth=18 model.backbone.with_cp=True'")
+             'in xxx=yyy format will be merged into config file. For example, '
+             "'--cfg-options model.backbone.depth=18 model.backbone.with_cp=True'")
     parser.add_argument(
         '--use-frames',
         default=False,
@@ -39,7 +43,7 @@ def parse_args():
         default=30,
         type=int,
         help='specify fps value of the output video when using rawframes to '
-        'generate file')
+             'generate file')
     parser.add_argument(
         '--font-scale',
         default=0.5,
@@ -55,8 +59,8 @@ def parse_args():
         default=None,
         type=int,
         help='Target resolution (w, h) for resizing the frames when using a '
-        'video as input. If either dimension is set to -1, the frames are '
-        'resized by keeping the existing aspect ratio')
+             'video as input. If either dimension is set to -1, the frames are '
+             'resized by keeping the existing aspect ratio')
     parser.add_argument(
         '--resize-algorithm',
         default='bicubic',
@@ -152,6 +156,7 @@ def get_output(video_path,
 
 
 def main():
+    print('!!!')
     args = parse_args()
     # assign the desired device.
     device = torch.device(args.device)
@@ -160,7 +165,9 @@ def main():
     cfg.merge_from_dict(args.cfg_options)
 
     # build the recognizer from a config file and checkpoint file/url
+    print('!!!')
     model = init_recognizer(cfg, args.checkpoint, device=device)
+    print('!!!')
 
     # e.g. use ('backbone', ) to return backbone feature
     output_layer_names = None
@@ -204,4 +211,5 @@ def main():
 
 
 if __name__ == '__main__':
+    print('?')
     main()
