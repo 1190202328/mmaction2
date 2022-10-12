@@ -354,6 +354,9 @@ def del_result(to_delete_file, output_dir='/home/jjiang/data/zoo_clip'):
 
 
 def analysis_result(output_dir='/home/jjiang/data/zoo_clip'):
+    total_class_clustered_dict, human_dict, total_class_human_changed = get_map_dict()
+    label_dict_key = {i: total_class_human_changed[i] for i in range(len(total_class_human_changed))}
+    label_dict_key[len(label_dict_key)] = 'background'
     for train_or_test in ['train.list', 'val.list']:
         label_dict = {}
         with open(f'{output_dir}/{train_or_test}', mode='r', encoding='utf-8') as f:
@@ -368,6 +371,7 @@ def analysis_result(output_dir='/home/jjiang/data/zoo_clip'):
         label_set = sorted(list(label_dict.keys()))
         print(len(label_set))
         pprint(label_dict)
+    pprint(label_dict_key)
 
 
 def get_video_duration(video_path: str):

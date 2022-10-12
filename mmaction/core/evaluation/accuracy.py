@@ -1,5 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import numpy as np
+from sklearn.metrics import classification_report
 
 
 def confusion_matrix(y_pred, y_real, normalize=None):
@@ -54,15 +55,15 @@ def confusion_matrix(y_pred, y_real, normalize=None):
 
     confusion_mat = np.bincount(
         num_labels * y_real_mapped + y_pred_mapped,
-        minlength=num_labels**2).reshape(num_labels, num_labels)
+        minlength=num_labels ** 2).reshape(num_labels, num_labels)
 
     with np.errstate(all='ignore'):
         if normalize == 'true':
             confusion_mat = (
-                confusion_mat / confusion_mat.sum(axis=1, keepdims=True))
+                    confusion_mat / confusion_mat.sum(axis=1, keepdims=True))
         elif normalize == 'pred':
             confusion_mat = (
-                confusion_mat / confusion_mat.sum(axis=0, keepdims=True))
+                    confusion_mat / confusion_mat.sum(axis=0, keepdims=True))
         elif normalize == 'all':
             confusion_mat = (confusion_mat / confusion_mat.sum())
         confusion_mat = np.nan_to_num(confusion_mat)
@@ -131,7 +132,7 @@ def top_k_classes(scores, labels, k=10, mode='accurate'):
     return results
 
 
-def top_k_accuracy(scores, labels, topk=(1, )):
+def top_k_accuracy(scores, labels, topk=(1,)):
     """Calculate top k accuracy score.
 
     Args:
@@ -150,6 +151,49 @@ def top_k_accuracy(scores, labels, topk=(1, )):
         topk_acc_score = match_array.sum() / match_array.shape[0]
         res.append(topk_acc_score)
 
+    return res
+
+
+def classification_report_top1(scores, labels):
+    """计算top1的classification report.
+
+    Args:
+        scores (list[np.ndarray]): Prediction scores for each class.
+        labels (list[int]): Ground truth labels.
+        topk (tuple[int]): K value for top_k_accuracy. Default: (1, ).
+
+    Returns:
+        list[float]: Top k accuracy score for each k.
+    """
+    top_k = (1,)
+    res = []
+    labels = np.array(labels)[:, np.newaxis]
+    for k in top_k:
+        max_k_preds = np.argsort(scores, axis=1)[:, -k:][:, ::-1]
+        max_k_preds = max_k_preds.squeeze()
+        result = classification_report(labels, max_k_preds)
+        res.append(f'\n{result}')
+    return res
+
+
+def confusion_matrix_top1(scores, labels):
+    """计算top1的confusion_matrix.
+
+    Args:
+        scores (list[np.ndarray]): Prediction scores for each class.
+        labels (list[int]): Ground truth labels.
+        topk (tuple[int]): K value for top_k_accuracy. Default: (1, ).
+
+    Returns:
+        list[float]: Top k accuracy score for each k.
+    """
+    top_k = (1,)
+    res = []
+    for k in top_k:
+        max_k_preds = np.argsort(scores, axis=1)[:, -k:][:, ::-1]
+        max_k_preds = max_k_preds.squeeze()
+        result = confusion_matrix(labels, max_k_preds.tolist())
+        res.append(f'\n{result}')
     return res
 
 
@@ -294,7 +338,7 @@ def pairwise_temporal_iou(candidate_segments,
         if calculate_overlap_self:
             candidate_length = candidate_segment[1] - candidate_segment[0]
             t_overlap_self[:, i] = (
-                segments_intersection.astype(float) / candidate_length)
+                    segments_intersection.astype(float) / candidate_length)
 
     if candidate_segments_ndim == 1:
         t_iou = np.squeeze(t_iou, axis=1)
@@ -390,8 +434,8 @@ def average_recall_at_avg_proposals(ground_truth,
 
     # Computes average recall.
     pcn_list = np.arange(1, 101) / 100.0 * (
-        max_avg_proposals * float(total_num_videos) /
-        total_num_retrieved_proposals)
+            max_avg_proposals * float(total_num_videos) /
+            total_num_retrieved_proposals)
     matches = np.empty((total_num_videos, pcn_list.shape[0]))
     positives = np.empty(total_num_videos)
     recall = np.empty((temporal_iou_thresholds.shape[0], pcn_list.shape[0]))
@@ -413,7 +457,7 @@ def average_recall_at_avg_proposals(ground_truth,
                 # for each percentage of the proposals
                 matches[i, j] = np.count_nonzero(
                     (true_positives_temporal_iou[:, :num_retrieved_proposals]
-                     ).sum(axis=1))
+                    ).sum(axis=1))
 
         # Computes recall given the set of matches per video.
         recall[ridx, :] = matches.sum(axis=0) / positives.sum()
@@ -423,7 +467,7 @@ def average_recall_at_avg_proposals(ground_truth,
 
     # Get the average number of proposals per video.
     proposals_per_video = pcn_list * (
-        float(total_num_retrieved_proposals) / total_num_videos)
+            float(total_num_retrieved_proposals) / total_num_videos)
     # Get AUC
     area_under_curve = np.trapz(avg_recall, proposals_per_video)
     auc = 100. * float(area_under_curve) / proposals_per_video[-1]

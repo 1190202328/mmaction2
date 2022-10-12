@@ -14,6 +14,7 @@ from torch.utils.data import Dataset
 from ..core import (mean_average_precision, mean_class_accuracy,
                     mmit_mean_average_precision, top_k_accuracy)
 from .pipelines import Compose
+from ..core.evaluation.accuracy import classification_report_top1, confusion_matrix_top1
 
 
 class BaseDataset(Dataset, metaclass=ABCMeta):
@@ -73,7 +74,7 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
         self.ann_file = ann_file
         self.data_prefix = osp.realpath(
             data_prefix) if data_prefix is not None and osp.isdir(
-                data_prefix) else data_prefix
+            data_prefix) else data_prefix
         self.test_mode = test_mode
         self.multi_class = multi_class
         self.num_classes = num_classes
@@ -93,7 +94,7 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
             class_prob = []
             for _, samples in self.video_infos_by_class.items():
                 class_prob.append(len(samples) / len(self.video_infos))
-            class_prob = [x**self.power for x in class_prob]
+            class_prob = [x ** self.power for x in class_prob]
 
             summ = sum(class_prob)
             class_prob = [x / summ for x in class_prob]
@@ -179,7 +180,7 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
         metrics = metrics if isinstance(metrics, (list, tuple)) else [metrics]
         allowed_metrics = [
             'top_k_accuracy', 'mean_class_accuracy', 'mean_average_precision',
-            'mmit_mean_average_precision'
+            'mmit_mean_average_precision', 'classification_report_top1', 'confusion_matrix_top1'
         ]
 
         for metric in metrics:
@@ -198,12 +199,12 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
             if metric == 'top_k_accuracy':
                 topk = metric_options.setdefault('top_k_accuracy',
                                                  {}).setdefault(
-                                                     'topk', (1, 5))
+                    'topk', (1, 5))
                 if not isinstance(topk, (int, tuple)):
                     raise TypeError('topk must be int or tuple of int, '
                                     f'but got {type(topk)}')
                 if isinstance(topk, int):
-                    topk = (topk, )
+                    topk = (topk,)
 
                 top_k_acc = top_k_accuracy(results, gt_labels, topk)
                 log_msg = []
@@ -222,7 +223,7 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
                 continue
 
             if metric in [
-                    'mean_average_precision', 'mmit_mean_average_precision'
+                'mean_average_precision', 'mmit_mean_average_precision'
             ]:
                 gt_labels_arrays = [
                     self.label2array(self.num_classes, label)
@@ -238,6 +239,14 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
                     eval_results['mmit_mean_average_precision'] = mAP
                     log_msg = f'\nmmit_mean_average_precision\t{mAP:.4f}'
                 print_log(log_msg, logger=logger)
+                continue
+            if metric == 'classification_report_top1':
+                report = classification_report_top1(results, gt_labels)
+                print_log(report[0], logger=logger)
+                continue
+            if metric == 'confusion_matrix_top1':
+                report = confusion_matrix_top1(results, gt_labels)
+                print_log(report[0], logger=logger)
                 continue
 
         return eval_results
