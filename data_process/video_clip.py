@@ -2,6 +2,7 @@ import os
 import sys
 from pprint import pprint
 import subprocess
+import re
 
 import cv2
 import imageio
@@ -23,28 +24,22 @@ from tqdm import tqdm
 from data_process.analysis import get_map_dict
 
 label_en_map_dict = {
-    '捕食': 'predation',
-    '水豚嬉戏': 'capybara_play',
-    '水豚小动': 'capybara_move',
-    '海龟小动': 'turtle_move',
-    '熊嬉戏': 'bear_play',
-    '熊小动': 'bear_move',
-    '熊走路': 'bear_walk',
-    '狗小动': 'dog_move',
-    '狮子小动': 'lion_move',
-    '狮子走路': 'lion_walk',
-    '猫小动': 'cat_move',
-    '猴子小动': 'monkey_move',
-    '猴子走路': 'monkey_walk',
-    '老虎小动': 'tiger_move',
-    '老虎走路': 'tiger_walk',
-    '跳跃': 'jump',
-    '进食': 'eat'
+    '嬉戏互动': 'play&react',
+    '走动': 'walk',
+    '跑跳': 'jump&run',
+    '进食': 'eat',
+    'background': 'background'
+}
+
+to_reduction_class = {
+    '老虎走路': ['走动', 0.05],
+    '海龟进食': ['进食', 0.01],
+    '走动': ['走动', 0.3]
 }
 
 
 def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/home/jjiang/data/zoo_clip'):
-    background_per_video = 3
+    background_per_video = 5
     min_duration = 5
     max_duration = 30
     background_idx = 0
@@ -57,8 +52,16 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
     to_do_cmds = []
 
     total_class_clustered_dict, human_dict, total_class_human_changed = get_map_dict()
-    label_dict = {total_class_human_changed[i]: i for i in range(len(total_class_human_changed))}
+    label_dict = {}
+    for i in range(len(total_class_human_changed)):
+        l = total_class_human_changed[i]
+        if l in to_reduction_class:
+            l = to_reduction_class[l][0]
+        label_dict[l] = i
     label_dict['background'] = len(label_dict)
+    with open(f'{output_dir}/label.txt', mode='w', encoding='utf-8') as f:
+        for i in label_dict:
+            f.write(f'{label_en_map_dict[i]}\n')
 
     for train_or_test in os.listdir(source_dir):
         if train_or_test == 'train':
@@ -115,12 +118,16 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
                 os.makedirs(f'{output_dir}/videos/background')
             for segment_idx in range(total_gaps - 1):
                 duration_background = random.randint(min_duration, max_duration)
-                background_start = gaps[segment_idx][1]
+                background_start = gaps[segment_idx][1] + 5
                 if background_start + duration_background > gaps[segment_idx + 1][0]:
                     continue
                 # 超时了
                 if background_start + duration_background > total_time:
                     continue
+                # 删除太多的老虎背景
+                if re.match('.*虎.*', source_video_path) is not None:
+                    if random.random() >= 0.2:
+                        continue
 
                 output_video_name = f'background/background_{background_idx}.mp4'
                 copy_path = f'{output_dir}/videos/{output_video_name}'
@@ -155,6 +162,20 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
                 if new_label in total_class_human_changed and duration > 0:
                     local_idx = 0
                     while duration > max_duration:
+                        # 去除一部分特别多的数据
+                        if new_label in to_reduction_class:
+                            ratio = to_reduction_class[new_label][1]
+                            if random.random() >= ratio:
+                                start_time += int(max_duration * (1 - clip_overlap_ratio))
+                                duration -= int(max_duration * (1 - clip_overlap_ratio))
+                                continue
+                            if re.match('.*猫科动物.*', source_video_path) is not None and new_label == '进食':
+                                # 删除猫科动物的进食
+                                start_time += int(max_duration * (1 - clip_overlap_ratio))
+                                duration -= int(max_duration * (1 - clip_overlap_ratio))
+                                continue
+                            new_label = to_reduction_class[new_label][0]
+
                         output_video_name = f'{new_label}/{file_name}_{segment_idx}_{local_idx}.mp4'
                         output_video_name_without_blank = ''.join(output_video_name.split(' '))
                         output_video_name = output_video_name_without_blank
@@ -177,6 +198,16 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
                         local_idx += 1
                     # 最后一个小片段
                     if start_time + duration <= total_time:
+                        if re.match('.*猫科动物.*', source_video_path) is not None and new_label == '进食':
+                            # 删除猫科动物的进食
+                            continue
+                        # 删除一些太多的片段
+                        if new_label in to_reduction_class:
+                            ratio = to_reduction_class[new_label][1]
+                            if random.random() >= ratio:
+                                continue
+                            new_label = to_reduction_class[new_label][0]
+
                         output_video_name = f'{new_label}/{file_name}_{segment_idx}_{local_idx}.mp4'
                         output_video_name_without_blank = ''.join(output_video_name.split(' '))
                         output_video_name = output_video_name_without_blank
@@ -192,7 +223,6 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
 
                         annotation_all += f'{output_video_name} {label_dict[new_label]}\n'
             to_do_cmds.append(local_segments)
-
         with open(annotation_output_path, mode='w', encoding='utf-8') as f:
             f.write(annotation_all)
 
@@ -374,9 +404,6 @@ def del_result(to_delete_file, output_dir='/home/jjiang/data/zoo_clip'):
 
 
 def analysis_result(output_dir='/home/jjiang/data/zoo_clip'):
-    total_class_clustered_dict, human_dict, total_class_human_changed = get_map_dict()
-    label_dict_key = {i: total_class_human_changed[i] for i in range(len(total_class_human_changed))}
-    label_dict_key[len(label_dict_key)] = 'background'
     for train_or_test in ['train.list', 'val.list']:
         label_dict = {}
         with open(f'{output_dir}/{train_or_test}', mode='r', encoding='utf-8') as f:
@@ -391,12 +418,6 @@ def analysis_result(output_dir='/home/jjiang/data/zoo_clip'):
         label_set = sorted(list(label_dict.keys()))
         print(len(label_set))
         pprint(label_dict)
-    pprint(label_dict_key)
-    if os.path.exists(f'{output_dir}/label.txt'):
-        print(f'标签文件已存在，路径:[{output_dir}/label.txt]')
-    with open(f'{output_dir}/label.txt', mode='w', encoding='utf-8') as f:
-        for i in total_class_human_changed:
-            f.write(f'{label_en_map_dict[i]}\n')
 
 
 def get_video_duration(video_path: str):
@@ -443,10 +464,13 @@ def remove_blank_path(train_test_dir='/home/jjiang/data/train_test_video'):
 if __name__ == '__main__':
     # remove_blank_path()
 
-    # video_clip(output_dir='/home/jjiang/data/zoo_clip_new')
-    # remove_bad_video(output_dir='/home/jjiang/data/zoo_clip_new')
-    # del_result(to_delete_file='/home/jjiang/experiments/mmaction2/bad_video_list.txt', output_dir='/home/jjiang/data/zoo_clip_new')
-    # remove_bad_video(output_dir='/home/jjiang/data/zoo_clip_new')
+    video_clip(output_dir='/home/jjiang/data/zoo_clip_new')
+    # analysis_result(output_dir='/home/jjiang/data/zoo_clip_new')  # TODO 第一次才需要做这个
+
+    remove_bad_video(output_dir='/home/jjiang/data/zoo_clip_new')
+    del_result(to_delete_file='/home/jjiang/experiments/mmaction2/bad_video_list.txt',
+               output_dir='/home/jjiang/data/zoo_clip_new')
+    remove_bad_video(output_dir='/home/jjiang/data/zoo_clip_new')
     analysis_result(output_dir='/home/jjiang/data/zoo_clip_new')
 
     # 检查数据
