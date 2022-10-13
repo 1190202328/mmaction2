@@ -2,7 +2,8 @@
 optimizer = dict(
     type='SGD',
     # lr=0.01,  # this lr is used for 8 gpus
-    lr=0.0011,
+    # lr=0.0011, # 3卡
+    lr=0.0008,  # 2卡
     momentum=0.9,
     weight_decay=0.0001)
 optimizer_config = dict(grad_clip=dict(max_norm=40, norm_type=2))

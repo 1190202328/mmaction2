@@ -1,6 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import argparse
 import json
+import os
 import random
 from collections import deque
 from operator import itemgetter
@@ -16,8 +17,8 @@ from mmaction.apis import init_recognizer
 from mmaction.datasets.pipelines import Compose
 
 FONTFACE = cv2.FONT_HERSHEY_COMPLEX_SMALL
-FONTSCALE = 1
-THICKNESS = 1
+FONTSCALE = 4
+THICKNESS = 4
 LINETYPE = 1
 
 EXCLUED_STEPS = [
@@ -61,8 +62,8 @@ def parse_args():
         action=DictAction,
         default={},
         help='override some settings in the used config, the key-value pair '
-        'in xxx=yyy format will be merged into config file. For example, '
-        "'--cfg-options model.backbone.depth=18 model.backbone.with_cp=True'")
+             'in xxx=yyy format will be merged into config file. For example, '
+             "'--cfg-options model.backbone.depth=18 model.backbone.with_cp=True'")
     parser.add_argument(
         '--label-color',
         nargs='+',
@@ -85,8 +86,12 @@ def show_results_video(result_queue,
                        msg,
                        frame,
                        video_writer,
+                       frame_size,
                        label_color=(255, 255, 255),
                        msg_color=(128, 128, 128)):
+    frame_width, frame_height = frame_size
+    FONTSCALE = int((frame_width/3840)*4)
+    THICKNESS = int((frame_width/3840)*4)
     if len(result_queue) != 0:
         text_info = {}
         results = result_queue.popleft()
@@ -94,7 +99,7 @@ def show_results_video(result_queue,
             selected_label, score = result
             if score < thr:
                 break
-            location = (0, 40 + i * 20)
+            location = (frame_width - 250 * FONTSCALE, 40 * FONTSCALE + i * 20 * FONTSCALE)
             text = selected_label + ': ' + str(round(score, 2))
             text_info[location] = text
             cv2.putText(frame, text, location, FONTFACE, FONTSCALE,
@@ -104,7 +109,7 @@ def show_results_video(result_queue,
             cv2.putText(frame, text, location, FONTFACE, FONTSCALE,
                         label_color, THICKNESS, LINETYPE)
     else:
-        cv2.putText(frame, msg, (0, 40), FONTFACE, FONTSCALE, msg_color,
+        cv2.putText(frame, msg, (frame_width - 250 * FONTSCALE, 40 * FONTSCALE), FONTFACE, FONTSCALE, msg_color,
                     THICKNESS, LINETYPE)
     video_writer.write(frame)
     return text_info
@@ -127,11 +132,11 @@ def get_results_json(result_queue, text_info, thr, msg, ind, out_json):
     return text_info, out_json
 
 
-def show_results(model, data, label, args):
+def show_results(model, data, label, args, video_path, output_filepath):
     frame_queue = deque(maxlen=args.sample_length)
     result_queue = deque(maxlen=1)
 
-    cap = cv2.VideoCapture(args.video_path)
+    cap = cv2.VideoCapture(video_path)
     num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -144,8 +149,8 @@ def show_results(model, data, label, args):
     frame_size = (frame_width, frame_height)
 
     ind = 0
-    video_writer = None if args.out_file.endswith('.json') \
-        else cv2.VideoWriter(args.out_file, fourcc, fps, frame_size)
+    video_writer = None if output_filepath.endswith('.json') \
+        else cv2.VideoWriter(output_filepath, fourcc, fps, frame_size)
     prog_bar = mmcv.ProgressBar(num_frames)
     backup_frames = []
 
@@ -179,20 +184,20 @@ def show_results(model, data, label, args):
             results = scores_sorted[:num_selected_labels]
             result_queue.append(results)
 
-        if args.out_file.endswith('.json'):
+        if output_filepath.endswith('.json'):
             text_info, out_json = get_results_json(result_queue, text_info,
                                                    args.threshold, msg, ind,
                                                    out_json)
         else:
             text_info = show_results_video(result_queue, text_info,
                                            args.threshold, msg, frame,
-                                           video_writer, args.label_color,
+                                           video_writer, frame_size, args.label_color,
                                            args.msg_color)
 
     cap.release()
     cv2.destroyAllWindows()
-    if args.out_file.endswith('.json'):
-        with open(args.out_file, 'w') as js:
+    if output_filepath.endswith('.json'):
+        with open(output_filepath, 'w') as js:
             json.dump(out_json, js)
 
 
@@ -258,7 +263,23 @@ def main():
     args.sample_length = sample_length
     args.test_pipeline = test_pipeline
 
-    show_results(model, data, label, args)
+    if not os.path.exists(args.out_file):
+        os.makedirs(args.out_file)
+
+    video_paths = []
+    if args.video_path.endswith('.list'):
+        prefix = '/'.join(args.video_path.split('/')[:-1])
+        prefix += '/videos'
+        with open(args.video_path, mode='r', encoding='utf-8') as f:
+            for line in f.readlines():
+                video_path = line.strip().split(' ')[0]
+                video_paths.append([f'{prefix}/{video_path}', f'{args.out_file}/{video_path.replace("/", "_")}'])
+    else:
+        video_paths.append([args.video_path, f'{args.out_file}/{args.video_path.replace("/", "_")}'])
+
+    for video_path, output_file in video_paths:
+        show_results(model, data, label, args, video_path, output_file)
+        print(f'video saved at {output_file}')
 
 
 if __name__ == '__main__':
