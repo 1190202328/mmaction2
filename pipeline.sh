@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
-# shellcheck disable=SC2164
-cd ./data_process
-
-# 切片并检查
-python video_clip.py
-
-# shellcheck disable=SC2103
-cd ..
+## shellcheck disable=SC2164
+#cd ./data_process
+#
+## 切片并检查
+#python video_clip.py
+#
+## shellcheck disable=SC2103
+#cd ..
 
 # 训练
 CUDA_VISIBLE_DEVICES=0,1,2 \
