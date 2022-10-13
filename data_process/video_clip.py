@@ -57,7 +57,8 @@ def video_clip(source_dir='/home/jjiang/data/train_test_video', output_dir='/hom
         l = total_class_human_changed[i]
         if l in to_reduction_class:
             l = to_reduction_class[l][0]
-        label_dict[l] = i
+        if l not in label_dict:
+            label_dict[l] = len(label_dict)
     label_dict['background'] = len(label_dict)
     with open(f'{output_dir}/label.txt', mode='w', encoding='utf-8') as f:
         for i in label_dict:
@@ -464,13 +465,13 @@ def remove_blank_path(train_test_dir='/home/jjiang/data/train_test_video'):
 if __name__ == '__main__':
     # remove_blank_path()
 
-    video_clip(output_dir='/home/jjiang/data/zoo_clip_new')
+    # video_clip(output_dir='/home/jjiang/data/zoo_clip_new')
     # analysis_result(output_dir='/home/jjiang/data/zoo_clip_new')  # TODO 第一次才需要做这个
 
-    remove_bad_video(output_dir='/home/jjiang/data/zoo_clip_new')
-    del_result(to_delete_file='/home/jjiang/experiments/mmaction2/bad_video_list.txt',
-               output_dir='/home/jjiang/data/zoo_clip_new')
-    remove_bad_video(output_dir='/home/jjiang/data/zoo_clip_new')
+    # remove_bad_video(output_dir='/home/jjiang/data/zoo_clip_new')
+    # del_result(to_delete_file='/home/jjiang/experiments/mmaction2/bad_video_list.txt',
+    #            output_dir='/home/jjiang/data/zoo_clip_new')
+    # remove_bad_video(output_dir='/home/jjiang/data/zoo_clip_new')
     analysis_result(output_dir='/home/jjiang/data/zoo_clip_new')
 
     # 检查数据
