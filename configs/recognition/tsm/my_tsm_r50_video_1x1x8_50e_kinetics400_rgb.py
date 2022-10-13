@@ -1,19 +1,21 @@
 _base_ = [
-    '../../_base_/models/tsm_r50.py', '../../_base_/schedules/sgd_tsm_50e.py',
+    '../../_base_/models/my_tsm_r50.py', '../../_base_/schedules/my_sgd_tsm_50e.py',
     '../../_base_/default_runtime.py'
 ]
+
 # dataset settings
 dataset_type = 'VideoDataset'
-data_root = '/home/jjiang/data/zoo_clip/videos'
-ann_file_train = '/home/jjiang/data/zoo_clip/train.list'
-ann_file_val = '/home/jjiang/data/zoo_clip/val.list'
-ann_file_test = '/home/jjiang/data/zoo_clip/val.list'
+data_root = '/home/jjiang/data/zoo_clip_new/videos'
+data_root_val = '/home/jjiang/data/zoo_clip_new/videos'
+ann_file_train = '/home/jjiang/data/zoo_clip_new/train.list'
+ann_file_val = '/home/jjiang/data/zoo_clip_new/val.list'
+ann_file_test = '/home/jjiang/data/zoo_clip_new/val.list'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_bgr=False)
 train_pipeline = [
-    dict(type='OpenCVInit'),
+    dict(type='DecordInit'),
     dict(type='SampleFrames', clip_len=1, frame_interval=1, num_clips=8),
-    dict(type='OpenCVDecode'),
+    dict(type='DecordDecode'),
     dict(type='Resize', scale=(-1, 256)),
     dict(
         type='MultiScaleCrop',
@@ -30,14 +32,14 @@ train_pipeline = [
     dict(type='ToTensor', keys=['imgs', 'label'])
 ]
 val_pipeline = [
-    dict(type='OpenCVInit'),
+    dict(type='DecordInit'),
     dict(
         type='SampleFrames',
         clip_len=1,
         frame_interval=1,
         num_clips=8,
         test_mode=True),
-    dict(type='OpenCVDecode'),
+    dict(type='DecordDecode'),
     dict(type='Resize', scale=(-1, 256)),
     dict(type='CenterCrop', crop_size=224),
     dict(type='Normalize', **img_norm_cfg),
@@ -46,14 +48,14 @@ val_pipeline = [
     dict(type='ToTensor', keys=['imgs'])
 ]
 test_pipeline = [
-    dict(type='OpenCVInit'),
+    dict(type='DecordInit'),
     dict(
         type='SampleFrames',
         clip_len=1,
         frame_interval=1,
         num_clips=8,
         test_mode=True),
-    dict(type='OpenCVDecode'),
+    dict(type='DecordDecode'),
     dict(type='Resize', scale=(-1, 256)),
     dict(type='CenterCrop', crop_size=224),
     dict(type='Normalize', **img_norm_cfg),
@@ -63,7 +65,7 @@ test_pipeline = [
 ]
 data = dict(
     videos_per_gpu=8,
-    workers_per_gpu=6,
+    workers_per_gpu=2,
     test_dataloader=dict(videos_per_gpu=1),
     train=dict(
         type=dataset_type,
@@ -73,16 +75,21 @@ data = dict(
     val=dict(
         type=dataset_type,
         ann_file=ann_file_val,
-        data_prefix=data_root,
+        data_prefix=data_root_val,
         pipeline=val_pipeline),
     test=dict(
         type=dataset_type,
         ann_file=ann_file_test,
-        data_prefix=data_root,
+        data_prefix=data_root_val,
         pipeline=test_pipeline))
 evaluation = dict(
     interval=5, metrics=['top_k_accuracy', 'mean_class_accuracy'])
 
+# optimizer
+optimizer = dict(
+    # lr=0.02,  # this lr is used for 8 gpus
+    lr=0.005,  # this lr is used for 2 gpus
+)
 # runtime settings
 checkpoint_config = dict(interval=5)
-work_dir = './work_dirs/my_tsm_r50_1x1x8_100e_kinetics400_rgb/'
+work_dir = './work_dirs/tsm/'
