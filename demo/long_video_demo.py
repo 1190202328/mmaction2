@@ -12,6 +12,7 @@ import numpy as np
 import torch
 from mmcv import Config, DictAction
 from mmcv.parallel import collate, scatter
+from tqdm import tqdm
 
 from mmaction.apis import init_recognizer
 from mmaction.datasets.pipelines import Compose
@@ -278,7 +279,7 @@ def main():
     else:
         video_paths.append([args.video_path, f'{args.out_file}/{args.video_path.replace("/", "_")}'])
 
-    for video_path, output_file in video_paths:
+    for video_path, output_file in tqdm(video_paths):
         show_results(model, data, label, args, video_path, output_file)
         print(f'video saved at {output_file}')
 
