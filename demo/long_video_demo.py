@@ -206,6 +206,7 @@ def show_results(model, data, label, args, video_path, output_filepath):
 def inference(model, data, args, frame_queue):
     if len(frame_queue) != args.sample_length:
         # Do no inference when there is no enough frames
+        # print('\n Do no inference when there is no enough frames!')
         return False, None
 
     cur_windows = list(np.array(frame_queue))
