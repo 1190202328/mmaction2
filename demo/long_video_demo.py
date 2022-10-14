@@ -90,8 +90,9 @@ def show_results_video(result_queue,
                        label_color=(255, 255, 255),
                        msg_color=(128, 128, 128)):
     frame_width, frame_height = frame_size
-    FONTSCALE = int((frame_width/3840)*4)
-    THICKNESS = int((frame_width/3840)*4)
+    FONTSCALE = int((frame_width / 3840) * 4)
+    FONTSCALE = max(FONTSCALE, 1)
+    THICKNESS = FONTSCALE
     if len(result_queue) != 0:
         text_info = {}
         results = result_queue.popleft()
