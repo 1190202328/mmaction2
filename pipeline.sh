@@ -11,6 +11,6 @@
 
 # 训练
 CUDA_VISIBLE_DEVICES=0,1 \
-  bash tools/dist_train.sh configs/recognition/tsm/my_tsm_r50_video_1x1x8_50e_kinetics400_rgb.py 2 \
-  --work-dir work_dirs/tsm \
+  bash tools/dist_train.sh configs/recognition/slowfast/my_slowfast_r50_video_4x16x1_256e_kinetics400_rgb.py 2 \
+  --work-dir work_dirs/slowfast \
   --validate --seed 123456789 --deterministic
